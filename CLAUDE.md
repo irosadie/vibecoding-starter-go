@@ -37,7 +37,7 @@ If the user only types `Start`, `Mulai`, `Mulai Vibe Coding`, or similar:
 | `api-bugfix` | Backend | Fix backend bug with minimal touch and sync impacted contracts |
 | `api-code-review` | Backend | Review backend code strictly before merge or during quality audit |
 | `api-feature` | Backend | Implement new backend feature following Clean Architecture |
-| `db-prisma-schema` | Backend | Changes to schema.prisma and PostgreSQL migration validation |
+| `db-sqlc-schema` | Backend | Changes to goose migrations, sqlc queries, and PostgreSQL schema validation |
 | `docs-openapi` | Docs | Write or update split OpenAPI documentation per feature |
 | `ops-docker` | Ops | Write or modify backend Dockerfile for Linux deployment |
 | `ops-mcp-setup` | Ops | Setup GitHub MCP for this repo's workflow |

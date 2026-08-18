@@ -3,11 +3,12 @@
 ## Target Folders
 
 ```
-apps/api/src/interfaces/http/          → route, controller, middleware
-apps/api/src/application/              → service, use-case, DTO, validator
-apps/api/src/domain/                   → entity and repository contract
-apps/api/src/infrastructure/           → side-effect implementations
-packages/schemas/                      → shared request schemas when relevant
+apps/api/internal/interfaces/http/     → routes, controllers, middleware
+apps/api/internal/application/         → services, use-cases, DTOs
+apps/api/internal/domain/              → entities and repository interfaces
+apps/api/internal/infrastructure/      → database / external implementations
+apps/api/db/queries/                   → sqlc .sql source files
+apps/api/internal/infrastructure/db/   → sqlc generated (DO NOT EDIT)
 packages/types/                        → shared response types
 docs/openapi/                          → split OpenAPI source of truth
 docs/openapi.json                      → generated merged spec
@@ -16,10 +17,10 @@ docs/openapi.json                      → generated merged spec
 ## Impact Map
 
 Check in this order:
-1. Is the bug in request validation?
+1. Is the bug in request binding or middleware?
 2. Is the bug in orchestration / response mapping?
 3. Is the bug in a use-case business rule?
-4. Is the bug in repository / side effect?
+4. Is the bug in repository / side effect or sqlc query?
 5. Does the user-visible endpoint behavior change?
 
 ## Key Patterns
@@ -27,12 +28,13 @@ Check in this order:
 - Layer boundaries must stay clean during a bugfix
 - Minimal touch beats broad refactor
 - Response or error contract changes trigger an audit of `packages/types` and OpenAPI
-- Request shape changes trigger an audit of validator and `packages/schemas`
-- Edit OpenAPI in split files, then regenerate the merged spec
+- sqlc query changes require `sqlc generate` — never edit generated files
+- Edit OpenAPI in split files under `docs/openapi/`
 
 ## Active Surface Examples
 
-- `apps/api/src/interfaces/http/routes/root-route.ts`
-- `apps/api/src/application/services/system-service.ts`
-- `apps/api/src/application/use-cases/`
+- `apps/api/internal/interfaces/http/routes/routes.go`
+- `apps/api/internal/application/services/`
+- `apps/api/internal/application/use-cases/`
+- `apps/api/internal/interfaces/http/middleware/error_handler.go`
 - `docs/openapi/base.json`

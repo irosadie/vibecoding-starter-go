@@ -38,7 +38,7 @@
     },
     {
       "name": "api-bugfix",
-      "description": "Fix backend bugs with minimal touch, keep other layers stable, then sync validator, DTO, OpenAPI, shared schema/types, tests, and related docs when behavior is affected.",
+      "description": "Fix backend bugs with minimal touch, keep other layers stable, then sync DTO, OpenAPI, shared types, tests, and related docs when behavior is affected.",
       "scope": "backend",
       "path": ".agents/skills/api-bugfix",
       "whenToUse": "Fix backend bug with minimal touch and sync impacted contracts"
@@ -58,11 +58,11 @@
       "whenToUse": "Implement new backend feature following Clean Architecture"
     },
     {
-      "name": "db-prisma-schema",
-      "description": "Write or modify apps/api/prisma/schema.prisma and execute safe PostgreSQL migrations. Use for database model, relation, index, enum changes, or schema-to-domain-layer sync.",
+      "name": "db-sqlc-schema",
+      "description": "Write or modify SQL migration files (goose) and sqlc query files, then regenerate Go code. Use for database model, relation, index, enum changes, or schema-to-domain-layer sync.",
       "scope": "backend",
-      "path": ".agents/skills/db-prisma-schema",
-      "whenToUse": "Changes to schema.prisma and PostgreSQL migration validation"
+      "path": ".agents/skills/db-sqlc-schema",
+      "whenToUse": "Changes to goose migrations, sqlc queries, and PostgreSQL schema validation"
     },
     {
       "name": "docs-openapi",

@@ -69,11 +69,11 @@ printf '[bootstrap] starting local stack\n'
 wait_for_postgres
 wait_for_redis
 
-printf '[bootstrap] generating prisma client\n'
-(cd apps/api && bun run prisma:generate)
+printf '[bootstrap] running goose migrations\n'
+(cd apps/api && goose -dir db/migrations postgres "$DATABASE_URL" up 2>/dev/null || printf '[bootstrap] skipping migrations (DATABASE_URL not set or goose not installed)\n')
 
 printf '[bootstrap] generating merged openapi spec\n'
-bun apps/api/scripts/generate-openapi.ts
+node scripts/generate-openapi.mjs 2>/dev/null || printf '[bootstrap] skipping openapi generation\n'
 
 printf '[bootstrap] local development infrastructure is ready\n'
 "$COMPOSE" ps

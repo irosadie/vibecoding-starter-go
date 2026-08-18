@@ -17,7 +17,6 @@ Implement backend features professionally, following Clean Architecture.
 
 2. Read the guide for **each folder** before creating files there:
    - `.agents/guides/api-dto.md`
-   - `.agents/guides/api-validator.md`
    - `.agents/guides/api-entity.md`
    - `.agents/guides/api-repository.md`
    - `.agents/guides/api-usecase.md`
@@ -29,45 +28,46 @@ Implement backend features professionally, following Clean Architecture.
 
 3. Create files **in order** by layer dependency:
    ```
-   1. application/dtos/{Domain}Dto.ts
-   2. application/validators/{domain}.schemas.ts
-   3. domain/entities/{Domain}.ts
-   4. domain/repositories/I{Domain}Repository.ts
-   5. domain/use-cases/{verb}-{domain}.ts    (one per operation)
-   6. application/services/{Domain}Service.ts
-   7. infrastructure/database/Prisma{Domain}Repository.ts
-   8. interfaces/http/controllers/{Domain}Controller.ts
-   9. interfaces/http/routes/{domain}Routes.ts
-   10. Register in interfaces/http/create-app.ts
+   1. internal/application/dtos/{domain}.go
+   2. internal/domain/entities/{domain}.go
+   3. internal/domain/repositories/i_{domain}_repository.go
+   4. internal/domain/use-cases/{verb}_{domain}.go   (one per operation)
+   5. internal/application/services/{domain}_service.go
+   6. internal/infrastructure/database/pgx_{domain}_repository.go
+   7. internal/interfaces/http/controllers/{domain}_controller.go
+   8. internal/interfaces/http/routes/routes.go       (register new routes)
+   9. db/queries/{domain}.sql                         (sqlc query file)
+   10. Run: sqlc generate
    ```
 
 4. Error handling — do not catch in Service or Controller:
    ```
-   UseCase throws DomainError → errorHandler middleware
+   UseCase returns DomainError → Echo ErrorHandler middleware
    ```
 
 ## Prohibitions
 
-- **NEVER** use `any`.
+- **NEVER** use `interface{}` or `any` without explicit justification.
 - **NEVER** put business logic in the Controller.
-- **NEVER** access Prisma in a Use Case.
-- **NEVER** throw `HTTPException` from a Use Case — use `DomainError`.
+- **NEVER** access the database directly in a Use Case — go through repository interface.
+- **NEVER** return `echo.HTTPError` from a Use Case — use `domain.DomainError` from `packages/go-shared`.
 - **NEVER** change files unrelated to the task.
-- **NEVER** use plain `string` for fields with a fixed value set — import the shared enum from `@vibecoding-starter/schemas`.
+- **NEVER** use plain `string` for fields with a fixed value set — define as typed Go constant.
+- **NEVER** edit sqlc-generated files in `internal/infrastructure/db/` — regenerate instead.
 
 ## Pre-Completion Checklist
 
 - [ ] DTO created
-- [ ] Validator schema created
 - [ ] Entity created
 - [ ] Repository interface created
 - [ ] Use case(s) created (one per operation)
 - [ ] Service created
-- [ ] Prisma repository created
+- [ ] sqlc query file created and `sqlc generate` run
+- [ ] pgx repository implementation created
 - [ ] Controller created
-- [ ] Route created and registered in create-app.ts
-- [ ] No `any`
+- [ ] Route registered in `routes.go`
+- [ ] No `interface{}` / `any` without justification
 - [ ] No business logic in Controller
-- [ ] No Prisma in Use Case
-- [ ] `bun run build` passes
+- [ ] No DB access in Use Case
+- [ ] `go build ./...` passes
 - [ ] All files end with a newline (EOF)

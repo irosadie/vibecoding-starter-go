@@ -3,7 +3,7 @@
 Starter monorepo for building products with **vibe coding** — a workflow where AI agents (Claude Code / Codex) handle implementation tasks end-to-end, from feature planning to merge-ready PRs.
 
 This repo provides two things:
-1. **Production-ready starter monorepo** (Next.js + Hono + BullMQ + local PostgreSQL + local Redis)
+1. **Production-ready starter monorepo** (Next.js + Go/Echo + asynq + local PostgreSQL + local Redis)
 2. **Agent system** (`.agents/`) containing skills, guides, and code examples used by AI agents during coding
 
 Status:
@@ -29,13 +29,15 @@ Status:
 
 Stack:
 - `apps/web`: Next.js + Tailwind + Vitest
-- `apps/api`: Hono (clean architecture) + Prisma scaffold + Vitest
-- `apps/worker`: Worker scaffold + Redis + Vitest
+- `apps/api`: Go (Echo, Clean Architecture) + sqlc + goose + pgx
+- `apps/worker`: Go (asynq) + Redis
+- `packages/go-shared`: Shared Go module (DomainError) — used by api + worker via `go.work`
 - `docker-compose.yml`: PostgreSQL + Redis for local development
 - `scripts/`: repo-level helper executables for bootstrap and operations
-- `Turbo` for task orchestration
-- `Bun` as package manager and script runner
-- `Biome` for lint/format
+- `Turbo` for task orchestration (web + packages)
+- `Bun` as package manager and script runner (frontend)
+- `Biome` for lint/format (frontend)
+- `Go 1.26` for backend and worker
 
 ## Open Source
 
@@ -49,8 +51,9 @@ This repo is intended for public use:
 
 ### Monorepo Runtime
 - `apps/web` — Next.js App Router frontend
-- `apps/api` — Hono backend with clean architecture layering
-- `apps/worker` — Redis-based background worker
+- `apps/api` — Go backend with Echo and Clean Architecture layering (sqlc + goose + pgx)
+- `apps/worker` — Redis-based background worker (asynq)
+- `packages/go-shared` — Shared Go module for DomainError (used by api + worker via `go.work`)
 - `docker-compose.yml` — local PostgreSQL + Redis
 - `scripts/bootstrap-local.sh`, `scripts/compose.sh`, and other repo-level helpers
 
@@ -78,26 +81,27 @@ This repo is intended for public use:
 ### Backend Starter
 - API entrypoint with `/` and `/health` endpoints
 - Service + use case baseline for system info and health check
-- Controller, route, and test baseline for system endpoints
-- `DomainError` foundation for domain error handling
-- Separate env config in `infrastructure/config`
-- Middleware foundation for JWT, advanced auth, validation, and centralized error handling
-- HTTP response/query parser utilities and OpenAPI merge helper
-- Domain service skeleton for token and storage
-- JWT / token blacklist foundation for future auth features
-- Example use case test scaffold for backend patterns
-- Prisma scaffold and database config ready for development
+- Controller, route, and middleware baseline for system endpoints
+- `DomainError` foundation in `packages/go-shared/domain` — shared by api and worker
+- Separate env config in `internal/infrastructure/config`
+- Middleware foundation for JWT, auth session, and centralized error handling (Echo)
+- Auth domain: register, login, logout, get-current-user use cases
+- sqlc query layer + goose migrations for PostgreSQL
+- pgx/v5 connection pool
+- Go multi-stage Dockerfile ready for Linux deployment
 
 ### Worker Starter
-- Worker entrypoint connected to Redis
-- Summary use case for idle/active worker mode
-- Separate env config in `infrastructure/config`
+- Worker entrypoint connected to Redis (asynq)
+- Runtime summary job handler scaffold
+- Separate env config
 - Minimal queue bootstrap to start the first worker without business features
+- Go multi-stage Dockerfile ready for Linux deployment
 
 ### Shared Packages
-- `packages/schemas` — shared Zod schemas including auth/login starter
-- `packages/types` — shared response types baseline (`success`, `error`, auth response starter)
-- `packages/utils` — pure utility functions shared across apps
+- `packages/schemas` — Zod schemas for frontend forms (login, register)
+- `packages/types` — shared TypeScript response types for frontend API consumption
+- `packages/utils` — pure utility functions shared across frontend apps
+- `packages/go-shared` — shared Go module (DomainError) for backend apps
 
 Utilities in `packages/utils`:
 - currency format, date range, debounce, enum to object, string generator
@@ -106,7 +110,6 @@ Utilities in `packages/utils`:
 ### Docs & DevEx
 - OpenAPI split source in `docs/openapi/`
 - Merged OpenAPI spec at `docs/openapi.json`
-- [Scalar](https://scalar.com/) config at `apps/api/scalar.config.json` pointing to the merged spec
 - GitHub Actions for app CI and skill hygiene
 
 ### Agent Workflow
@@ -121,6 +124,7 @@ Utilities in `packages/utils`:
 
 Prerequisites:
 - Bun `>= 1.3`
+- Go `>= 1.26`
 - Docker
 
 ```bash
@@ -133,7 +137,7 @@ bun run dev
 - Copy `.env.example` to `.env` if it doesn't exist
 - Start PostgreSQL and Redis
 - Wait for services to be ready
-- Generate Prisma client
+- Run goose migrations
 - Generate merged OpenAPI spec
 
 After bootstrapping, initialize OpenSpec for the planning layer:
@@ -153,10 +157,17 @@ bun run stack:up
 bun run stack:down
 bun run stack:logs
 bun run session:status
-bun run prisma:generate
-bun run prisma:migrate:dev
-bun run prisma:studio
+bun run go:build
+bun run go:test
 bun run openapi:generate
+```
+
+Backend-specific (run from `apps/api/`):
+```bash
+go run ./cmd/server/main.go        # dev server
+go test ./...                      # run tests
+sqlc generate                      # regenerate DB queries
+goose -dir db/migrations postgres "$DATABASE_URL" up   # run migrations
 ```
 
 ## Key Endpoints
@@ -165,11 +176,10 @@ bun run openapi:generate
 - Web register: `http://localhost:3000/register`
 - Web auth route: `http://localhost:3000/api/auth/*`
 - Web internal proxy: `http://localhost:3000/api/proxy/*`
-- API root: `http://localhost:3001/`
-- API health: `http://localhost:3001/health`
-- Prisma Studio: `http://localhost:5555`
+- API root: `http://localhost:8080/`
+- API health: `http://localhost:8080/health`
+- API auth: `http://localhost:8080/api/auth/*`
 - Merged OpenAPI spec: `docs/openapi.json`
-- Scalar config source: `apps/api/scalar.config.json`
 
 ## OpenAPI & Scalar
 
@@ -177,13 +187,11 @@ The OpenAPI workflow is ready for docs tooling:
 - Split JSON source of truth in `docs/openapi/base.json`, `docs/openapi/paths/*.json`, and `docs/openapi/schemas/*.json`
 - Merged artifact at `docs/openapi.json`
 - Merge generator runs via `bun run openapi:generate`
-- Scalar config at `apps/api/scalar.config.json`
 
 This means:
 - Don't edit `docs/openapi.json` directly
 - Update specs in the split `docs/openapi/` folder
 - Regenerate the merged spec afterward
-- The merged file is ready for Scalar since the repo config points to `./docs/openapi.json`
 
 ## Quality Checks
 
@@ -193,10 +201,12 @@ bun run check
 
 Partial commands:
 ```bash
-bun run lint
-bun run typecheck
-bun run test
-bun run build
+bun run lint          # Biome lint (frontend)
+bun run typecheck     # TypeScript typecheck (frontend)
+bun run test          # frontend tests
+bun run go:test       # Go tests (api + worker)
+bun run go:build      # Go build (api + worker)
+bun run build         # full turbo build
 ```
 
 Generate merged OpenAPI spec:
@@ -354,11 +364,11 @@ Output: page.tsx + [feature]-content.tsx
 #### 2b. Backend + OpenAPI
 > Skill: `api-feature` + `docs-openapi`
 
-Implement Clean Architecture in Hono: entity → use case → repository → controller → route.
+Implement Clean Architecture in Go/Echo: entity → use case → repository → controller → route.
 Write split OpenAPI documentation alongside.
 
 ```
-Target: apps/api/src/
+Target: apps/api/internal/
          docs/openapi/
 ```
 
@@ -405,7 +415,7 @@ Recommended workflow:
 2. Run `bun install`
 3. Run `bun run bootstrap`
 4. Make your changes
-5. Ensure `bun run check` passes
+5. Ensure `bun run check` passes for frontend, `go build ./...` for backend
 6. If touching skills / `.agents`, also run `bun run skills:sync` and `bun run skills:validate`
 7. Open a pull request
 
