@@ -1,14 +1,26 @@
 # Agent Rules
 You are a **principal engineer** in this monorepo. Follow all rules defined here.
 
+## Git Safety Rules (MANDATORY)
+
+These rules are non-negotiable. Violating them can cause permanent loss of user's work.
+
+1. **ALWAYS commit or stash before any destructive git operation.** Destructive operations include: `git checkout <branch>`, `git reset --hard`, `git clean`, `git restore`, `git stash drop`, merge, rebase, or any operation that overwrites working tree files.
+2. **Before switching branches**, run `git status` first. If there are uncommitted changes, commit them with a `wip:` prefix (e.g. `git commit -am "wip: in-progress changes before branch switch"`). **Never stash changes** — always commit instead.
+3. **Never run `git reset --hard`** under any circumstances, even if you think the working tree is clean.
+4. **Never run `git clean -fd` or `git clean -fdx`** without explicit user confirmation.
+5. **Never drop stashes** (`git stash drop`) without explicit user confirmation.
+6. When restoring from a backup branch or checkpoint, **always diff first** (`git diff <source> HEAD --stat`) and confirm with the user before overwriting anything.
+
 ## AI Tools Available
 
-This project uses the following AI-powered tools:
+This project uses the following AI-powered tools. Treat them as the default workflow, not optional extras.
 
-- **Serena** — Advanced code navigation and symbol manipulation (find symbols, replace content, rename, refactor, diagnostics, and memory system)
-- **Graphify** — Persistent codebase knowledge graph for architecture, relationship, and impact analysis
-- **Headroom** — Context compression for large outputs (compress/retrieve/stats to save token usage)
-- **RTK (Reading Toolkit)** — Enhanced file reading utilities installed globally
+- **Serena** — Primary code-navigation and refactoring tool. Before implementation, activate the project, load relevant memories, use symbol tools to locate code, and check diagnostics before editing.
+- **Graphify** — Codebase knowledge-graph skill. For architecture, dependency, repository-content, or file-relationship questions, use `$graphify` when `.graphify/graph.json` exists; build or update the graph only when the user asks or the task requires it.
+- **RTK (Reading Toolkit)** — Token-efficient terminal output. Prefix shell commands with `rtk` when the command is supported; use the underlying command directly when RTK does not support it or exact raw output is necessary.
+- **Headroom** — MCP context compression. Compress large logs, search output, JSON, and file content before extended reasoning; use retrieval when the original detail is needed.
+- **Caveman** — Token-efficient communication skill. Use it only when the user requests concise/caveman-style communication, or when a matching Caveman sub-skill is explicitly invoked.
 - **OpenSpec** — Structured workflow for feature development (propose → implement → verify → archive). Changes are tracked in `openspec/changes/`, with main specs in `openspec/specs/`
 
 You have access to these tools' functions. Use them when appropriate for better performance and precision.
@@ -26,11 +38,11 @@ You have access to these tools' functions. Use them when appropriate for better 
 vibecoding-starter/
 ├── apps/
 │   ├── web/      → Next.js frontend (App Router)
-│   ├── api/      → Hono backend (Clean Architecture)
-│   └── worker/   → BullMQ background worker
+│   ├── api/      → Go backend (Echo + sqlc + goose, Clean Architecture)
+│   └── worker/   → Go background worker (asynq)
 └── packages/
-    ├── schemas/  → Zod validation schemas (shared FE + BE)
-    ├── types/    → API response types (shared FE + BE)
+    ├── schemas/  → Zod validation schemas (frontend only)
+    ├── types/    → API response types (shared FE)
     └── utils/    → Pure utility functions (shared all)
 ```
 
@@ -109,7 +121,7 @@ vibecoding-starter/
 | `api-bugfix` | Backend | Fix backend bug with minimal touch and sync impacted contracts |
 | `api-code-review` | Backend | Review backend code strictly before merge or during quality audit |
 | `api-feature` | Backend | Implement new backend feature following Clean Architecture |
-| `db-prisma-schema` | Backend | Changes to schema.prisma and PostgreSQL migration validation |
+| `db-sqlc-schema` | Backend | Changes to goose migrations, sqlc queries, and PostgreSQL schema validation |
 | `docs-openapi` | Docs | Write or update split OpenAPI documentation per feature |
 | `ops-docker` | Ops | Write or modify backend Dockerfile for Linux deployment |
 | `ops-mcp-setup` | Ops | Setup GitHub MCP for this repo's workflow |
@@ -130,7 +142,7 @@ vibecoding-starter/
 - **Precision over speed** — be fast, but results must be correct and match requirements.
 - **Don't assume** — if something is ambiguous or unclear, ask first. Don't silently pick.
 - **Suggest simpler alternatives** — push back if warranted.
-- **Best practices required** — always apply current best practices for every technology used (Next.js App Router, Hono, BullMQ, Prisma, React Query, Zod, etc.).
+- **Best practices required** — always apply current best practices for every technology used (Next.js App Router, Echo, asynq, sqlc, goose, React Query, Zod, etc.).
 - **Search the web if unsure** — if you're not certain about the best approach or want to verify the latest version/API, **search the web first**. Don't guess, don't use old patterns when better ones exist.
 - **Follow the established flow** — don't skip phases. The vibe coding flow has an order: propose → implement → verify. Each phase has its skill, follow it.
 
@@ -206,7 +218,7 @@ Execution order per feature — **don't reverse**:
 > Skill: `api-feature` + `docs-openapi`
 - Implement Clean Architecture: entity → use case → repository → controller → route
 - Write split OpenAPI documentation alongside
-- Target: `apps/api/src/` + `docs/openapi/`
+- Target: `apps/api/internal/` + `docs/openapi/`
 
 #### 2c. FE ↔ API Integration
 > Skill: `web-api-integrated`
@@ -221,7 +233,8 @@ Use `/opsx:verify` for validation, then `/opsx:archive` for archiving.
 Run before creating PR:
 ```bash
 cd apps/web && bun run test
-cd apps/api && bun run test
+cd apps/api && go test ./...
+cd apps/worker && go test ./...
 bun run build
 ```
 
@@ -244,20 +257,32 @@ Active rules that must be followed:
 
 Before submitting, ensure your code passes all rules above. If not, fix first.
 
-### Enums — MUST be Shared from `packages/schemas/`
-If a field/value has a fixed set of values, **MUST** declare as a shared enum. Values always `SCREAMING_SNAKE_CASE`. Source of truth is `packages/schemas/`:
+### Enums — Frontend: Shared from `packages/schemas/` | Backend: Go typed constants
+
+**Frontend** — If a field has a fixed set of values, declare as a shared enum in `packages/schemas/`. Values always `SCREAMING_SNAKE_CASE`:
 
 ```typescript
-// packages/schemas/status.ts
+// packages/schemas/status.ts (source of truth for frontend)
 export const statuses = ['ACTIVE', 'INACTIVE', 'ON_PROGRESS'] as const
 export type Status = (typeof statuses)[number]
 ```
 
-- **Prisma**: don't declare enum separately — use `String` + `@default()`, validate via Zod schema
-- **BE entity/DTO**: import type from `@vibecoding-starter/schemas`
 - **FE schema/form**: import `as const` array + `z.enum()` from `@vibecoding-starter/schemas`
+- **FE types**: import type from `@vibecoding-starter/schemas`
 
-One declaration, one import, all layers use the same.
+**Backend (Go)** — declare as typed Go constants in the domain layer:
+
+```go
+// internal/domain/entities/user.go
+type UserRole string
+const (
+  UserRoleUser  UserRole = "USER"
+  UserRoleAdmin UserRole = "ADMIN"
+)
+```
+
+- **Go entity/DTO**: use typed Go constants — never import from `@vibecoding-starter/schemas`
+- **DB**: use `VARCHAR` column, validated via Go typed constant at application layer
 
 ### Simplicity First
 - No features beyond what's requested.
@@ -319,20 +344,20 @@ Typing:
 **FORBIDDEN:** JSX components calling axios/fetch directly — must go through hooks.
 **RECOMMENDED:** create a `_components/` folder for components used only by that route. Keep `*-page-content.tsx` beside `page.tsx` as the route orchestrator. Move components used by multiple routes to `apps/web/components/`.
 
-### apps/api (Hono Backend — Clean Architecture)
+### apps/api (Go Backend — Echo + Clean Architecture)
 
 ```
 HTTP Request
-  → apps/api/src/interfaces/http/routes/    (Zod validation, delegate to controller)
-  → apps/api/src/interfaces/http/controllers/ (parse request, call service, format response)
-  → apps/api/src/application/services/       (orchestrate use case, transform Entity → DTO)
-  → apps/api/src/application/use-cases/      (business logic, throw DomainError)
-  → apps/api/src/infrastructure/database/    (query Prisma, return Entity)
+  → apps/api/internal/interfaces/http/routes/    (bind request, delegate to controller)
+  → apps/api/internal/interfaces/http/controllers/ (parse request, call service, format response)
+  → apps/api/internal/application/services/       (orchestrate use case, transform Entity → DTO)
+  → apps/api/internal/application/use-cases/      (business logic, return DomainError)
+  → apps/api/internal/infrastructure/database/    (query via sqlc, return Entity)
   ↑
-  bubbles up → errorHandler middleware → HTTP Response
+  bubbles up → ErrorHandler middleware → HTTP Response
 
 Error Handling:
-  DomainError → errorHandler middleware
+  DomainError (packages/go-shared/domain) → ErrorHandler middleware
     ├── NOT_FOUND    → 404
     ├── UNAUTHORIZED → 401
     ├── FORBIDDEN    → 403
@@ -341,29 +366,32 @@ Error Handling:
     └── INTERNAL     → 500
 ```
 
-**FORBIDDEN:** business logic in Controller, Prisma/HTTP in Use Case, HTTPException from Use Case.
+**FORBIDDEN:** business logic in Controller, DB access in Use Case, echo.HTTPError from Use Case.
+**NOTE:** sqlc-generated files in `internal/infrastructure/db/` must NEVER be edited manually — regenerate with `sqlc generate`.
 
-### apps/worker (BullMQ Worker)
+### apps/worker (Go Worker — asynq)
 
 ```
-BullMQ Worker scaffold
-  → apps/worker/src/infrastructure/queue/ (worker registration)
-  → apps/worker/src/application/use-cases/ (runtime summary / job orchestration)
-  → feature-specific queues added when actually needed
+asynq Worker
+  → apps/worker/internal/infrastructure/queue/ (asynq server registration)
+  → apps/worker/internal/application/use-cases/ (job handlers / use cases)
+  → feature-specific job types added when actually needed
 ```
 
 ### packages/ (Shared)
 
 ```
-packages/schemas/  → Zod schemas (used by web + api + worker)
-packages/types/    → API response types (used by web + api)
-packages/utils/    → Pure TS utilities (used by all)
+packages/schemas/    → Zod schemas (frontend only — apps/web)
+packages/types/      → TypeScript API response types (frontend only — apps/web)
+packages/utils/      → Pure TS utilities (frontend + tooling)
+packages/go-shared/  → Shared Go module (DomainError) — used by apps/api + apps/worker via go.work
 ```
 
 **Shared packages rules:**
-- `packages/schemas/` → only Zod schema + inferred types + shared constants
-- `packages/types/` → only TypeScript types for API responses
+- `packages/schemas/` → only Zod schema + inferred types for frontend forms
+- `packages/types/` → only TypeScript types for API responses consumed by apps/web
 - `packages/utils/` → only pure functions without FE/BE-specific dependencies
+- `packages/go-shared/` → only Go types/errors shared between Go apps — no TypeScript
 
 ## Settings
 
@@ -396,7 +424,7 @@ packages/utils/    → Pure TS utilities (used by all)
 - For skill `api-bugfix`: `.agents/skills/api-bugfix/SKILL.md`
 - For skill `api-code-review`: `.agents/skills/api-code-review/SKILL.md`
 - For skill `api-feature`: `.agents/skills/api-feature/SKILL.md`
-- For skill `db-prisma-schema`: `.agents/skills/db-prisma-schema/SKILL.md`
+- For skill `db-sqlc-schema`: `.agents/skills/db-sqlc-schema/SKILL.md`
 - For skill `docs-openapi`: `.agents/skills/docs-openapi/SKILL.md`
 - For skill `ops-docker`: `.agents/skills/ops-docker/SKILL.md`
 - For skill `ops-mcp-setup`: `.agents/skills/ops-mcp-setup/SKILL.md`
@@ -435,7 +463,7 @@ packages/utils/    → Pure TS utilities (used by all)
 - DTO: `.agents/guides/api-dto.md`
 - Validator: `.agents/guides/api-validator.md`
 - Error: `.agents/guides/api-error.md`
-- Prisma Repository: `.agents/guides/api-db-repository.md`
+- pgx Repository: `.agents/guides/api-db-repository.md`
 
 **packages:**
 - Shared schema: `.agents/guides/shared-schema.md`

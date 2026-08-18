@@ -10,14 +10,16 @@
 
 - [ ] Root cause localized to the smallest layer
 - [ ] Changes remain minimal touch
-- [ ] Validator/DTO/schema/type/docs/OpenAPI updated when affected
+- [ ] DTO/type/docs/OpenAPI updated when affected
+- [ ] sqlc regenerated if query changed (`sqlc generate`)
 - [ ] No unrelated refactor
 - [ ] Reproduction or guard test added/updated
 
 ## Finalization
 
 - [ ] Backend contract stays in sync
-- [ ] `bun run openapi:generate` run if contract changed
-- [ ] Lint/typecheck/relevant tests run
+- [ ] OpenAPI updated if contract changed
+- [ ] `go vet ./...` passes on touched surface
+- [ ] `go build ./...` passes
 - [ ] No unrelated changes carried along
 - [ ] All files end with a newline (EOF)

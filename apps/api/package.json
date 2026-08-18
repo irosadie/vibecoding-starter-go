@@ -2,34 +2,15 @@
   "name": "@vibecoding-starter/api",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "bun build ./src/index.ts --outdir ./dist --target node",
-    "start": "node dist/index.js",
-    "lint": "biome check .",
-    "format": "biome format --write .",
-    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
-    "prisma:migrate:dev": "prisma migrate dev --schema ./prisma/schema.prisma",
-    "prisma:seed": "tsx prisma/seed.ts",
-    "prisma:studio": "prisma studio --schema ./prisma/schema.prisma --port 5555",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:smoke": "vitest run src/interfaces/http/routes/app-smoke.test.ts"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.14.0",
-    "@prisma/client": "^7.4.2",
-    "hono": "^4.7.5",
-    "jsonwebtoken": "^9.0.3",
-    "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.14.1",
-    "prisma": "^7.4.2",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.3",
-    "vitest": "^3.1.1"
+    "dev": "go run ./cmd/server/main.go",
+    "build": "go build -o dist/server ./cmd/server/main.go",
+    "start": "./dist/server",
+    "lint": "go vet ./...",
+    "test": "go test ./...",
+    "test:smoke": "go test ./... -run TestSmoke",
+    "db:migrate": "goose -dir db/migrations postgres \"$DATABASE_URL\" up",
+    "db:migrate:down": "goose -dir db/migrations postgres \"$DATABASE_URL\" down",
+    "sqlc:generate": "sqlc generate"
   }
 }

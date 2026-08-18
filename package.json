@@ -37,7 +37,10 @@
     "skills:sync": "bun run skills:sync-registry && bun run skills:sync-claude",
     "skills:sync-claude": "node .agents/scripts/sync-claude-skills.mjs",
     "skills:sync-registry": "node .agents/scripts/sync-skill-registry.mjs",
-    "skills:validate": "node .agents/scripts/validate-skills.mjs"
+    "skills:validate": "node .agents/scripts/validate-skills.mjs",
+    "go:build": "cd apps/api && go build ./... && cd ../worker && go build ./...",
+    "go:test": "cd apps/api && go test ./... && cd ../worker && go test ./...",
+    "go:tidy": "cd apps/api && go mod tidy && cd ../worker && go mod tidy"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

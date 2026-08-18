@@ -16,22 +16,22 @@ Use this skill when the user asks for review of backend changes, an API PR, or a
 ### 1. Define the Review Surface
 
 Read the diff or target files, then map the relevant surface:
-- `apps/api/src/interfaces/http`
-- `apps/api/src/application`
-- `apps/api/src/domain`
-- `apps/api/src/infrastructure`
-- `packages/schemas`
-- `packages/types`
-- `docs/openapi`
+- `apps/api/internal/interfaces/http/`
+- `apps/api/internal/application/`
+- `apps/api/internal/domain/`
+- `apps/api/internal/infrastructure/`
+- `packages/go-shared/domain/` (DomainError)
+- `packages/types/`
+- `docs/openapi/`
 
-If the change touches an endpoint, validator, DTO, or response shape, audit contract artifacts too.
+If the change touches a route, controller, DTO, or response shape, audit contract artifacts too.
 
 ### 2. Prioritize Real Risk
 
 Find issues in this priority order:
 1. functional bugs and endpoint regressions
 2. clean architecture violations / boundary leakage
-3. validator, DTO, schema, type, and OpenAPI drift
+3. DTO, type, and OpenAPI drift
 4. error handling and status code mismatch
 5. wrong persistence / queue side effects
 6. test gaps for important behavior
@@ -39,12 +39,13 @@ Find issues in this priority order:
 ### 3. Audit Against Repo Standards
 
 Check strictly:
-- flow stays `route -> controller -> service -> use case`
-- request validation does not leak into the wrong layer
+- flow stays `route -> controller -> service -> use case -> repository`
+- request binding does not leak into use cases
 - repository interface and implementation stay aligned
-- errors bubble to `errorHandler`, not handled ad hoc
-- request/response contract stays in sync with `packages/schemas`, `packages/types`, and `docs/openapi`
-- important behavior changes have relevant tests
+- errors bubble to `ErrorHandler` middleware via `DomainError` — not handled ad hoc
+- request/response contract stays in sync with `packages/types` and `docs/openapi`
+- sqlc-generated files in `internal/infrastructure/db/` are not manually edited
+- important behavior changes have relevant Go tests
 
 ### 4. Format the Review Output
 
@@ -81,6 +82,7 @@ This skill defaults to review, not implementation. Do not change code unless the
 - [ ] Review scope mapped from diff or target files
 - [ ] Backend layering checked
 - [ ] Contract artifacts checked when endpoint changes
+- [ ] sqlc-generated files not manually edited
 - [ ] Findings ordered by severity
 - [ ] No summary ahead of findings
 - [ ] If no findings, residual risk or test gap still called out

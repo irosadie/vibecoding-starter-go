@@ -14,8 +14,9 @@
 
   "stack": {
     "frontend": "Next.js (App Router)",
-    "backend": "Hono (Clean Architecture)",
-    "language": "TypeScript",
+    "backend": "Go (Echo + sqlc + goose)",
+    "worker": "Go (asynq)",
+    "language": "TypeScript (frontend), Go (backend/worker)",
     "styling": "Tailwind CSS",
     "packageManager": "bun"
   },

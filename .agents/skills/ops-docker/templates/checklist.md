@@ -3,33 +3,33 @@
 ## Preparation
 
 - [ ] Identify target: `apps/api` and/or `apps/worker`
-- [ ] Check whether Prisma is used in target app
-- [ ] Check ports exposed in source code
+- [ ] Check ports exposed in source code (`cmd/server/main.go`)
+- [ ] Confirm `go.work` and `packages/go-shared/` are at repo root
 
 ## Dockerfile
 
 - [ ] Multi-stage build (builder + runner)
-- [ ] Base image: `oven/bun:1-alpine`
-- [ ] `--frozen-lockfile` on `bun install`
-- [ ] Monorepo packages (`packages/`) copied in builder stage
-- [ ] Build artifact copied from builder to runner
-- [ ] If Prisma: `prisma generate` runs in builder
+- [ ] Builder image: `golang:1.26-alpine`
+- [ ] Runner image: `alpine:3.20`
+- [ ] `go.work`, `go.work.sum*`, and `packages/go-shared/` copied in builder stage
+- [ ] Go binary built with `go build -o /bin/<name> ./cmd/<name>/main.go`
+- [ ] Only compiled binary copied into runner stage
 - [ ] Non-root user created and used in runner stage
-- [ ] `ENV NODE_ENV=production` in runner stage
-- [ ] `EXPOSE` matches used port
-- [ ] `CMD` runs compiled artifact
+- [ ] `ca-certificates` and `tzdata` installed in runner stage
+- [ ] `EXPOSE` matches used port (api: 8080)
+- [ ] `CMD` runs compiled binary (`["./server"]` or `["./worker"]`)
 
 ## Security
 
 - [ ] No `.env` or credentials in image
 - [ ] Non-root user
-- [ ] No dev dependencies in runner stage
+- [ ] No build tools or source code in runner stage
 
 ## Validation
 
-- [ ] Build succeeds: `docker build -f apps/{app}/Dockerfile -t test:latest .`
-- [ ] Container runs: `docker run --rm -e ... test:latest`
-- [ ] Reasonable image size (< 300MB for Bun Alpine)
+- [ ] Build context is monorepo root: `docker build -f apps/{app}/Dockerfile -t test:latest .`
+- [ ] Container runs: `docker run --rm -e DATABASE_URL=... -e JWT_SECRET=... test:latest`
+- [ ] Image size reasonable (Go Alpine binary typically < 50MB)
 
 ## Finalization
 

@@ -7,33 +7,17 @@ apps/api/Dockerfile
 apps/worker/Dockerfile
 ```
 
-## Monorepo Structure in Container
+## Monorepo Structure in Container (build context = root)
 
 ```
 /app/
-├── package.json       ← monorepo root
-├── bun.lockb
+├── go.work
+├── go.work.sum
 ├── packages/
-│   ├── schemas/
-│   ├── types/
-│   └── utils/
+│   └── go-shared/    ← shared Go module (DomainError)
 └── apps/
-    ├── api/
-    └── worker/
-```
-
-## Prisma in Docker
-
-If `apps/api` uses Prisma, add to builder stage:
-
-```dockerfile
-COPY apps/api/prisma ./apps/api/prisma
-RUN cd apps/api && bunx prisma generate
-```
-
-And in runner stage, copy Prisma schema:
-```dockerfile
-COPY --from=builder /app/apps/api/prisma ./prisma
+    ├── api/          ← Echo + sqlc + goose
+    └── worker/       ← asynq
 ```
 
 ## Environment Variables
@@ -44,26 +28,25 @@ Never hardcode in Dockerfile. Inject at `docker run` or via orchestrator:
 docker run \
   -e DATABASE_URL="postgresql://..." \
   -e REDIS_URL="redis://..." \
-  -p 3000:3000 \
+  -e JWT_SECRET="..." \
+  -p 8080:8080 \
   my-api:latest
 ```
 
 ## Build Command
 
 ```bash
-# From monorepo root
+# Build context MUST be monorepo root (for go.work + packages/go-shared)
 docker build -f apps/api/Dockerfile -t my-api:latest .
 docker build -f apps/worker/Dockerfile -t my-worker:latest .
 ```
 
-Build context must be the root so `packages/` can be copied.
-
 ## Layer Caching Tips
 
 Optimal COPY order for cache hits:
-1. `package.json` + `bun.lockb` (rarely change)
-2. `packages/` (rarely change)
-3. `bun install` (cache keyed by lockfile)
+1. `go.work` + `go.work.sum` (rarely change)
+2. `packages/go-shared/` (rarely change)
+3. `apps/{api,worker}/go.mod` + `go.sum` (changes when deps change)
 4. Source code (changes often — place last)
 
 ## .dockerignore
@@ -76,4 +59,5 @@ dist
 .git
 apps/web
 docs
+*.md
 ```

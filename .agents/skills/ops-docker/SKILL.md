@@ -7,105 +7,101 @@ description: Write or modify Dockerfiles for this backend so it is ready to depl
 
 ## Context (Required)
 - Target: Dockerfile in `apps/api/` and/or `apps/worker/`
-- Stack: Hono + Bun + TypeScript
+- Stack: Go (Echo + sqlc for api, asynq for worker)
 - **Do NOT touch `docker-compose.yml`** — managed by the server
 
 ## Principles
 
 - Multi-stage build to minimize image size
-- `builder` stage: install deps + compile
-- `runner` stage: runtime artifact only
-- Use `bun` as runtime (not Node.js)
+- `builder` stage: compile Go binary
+- `runner` stage: minimal alpine with binary only
 - Run as non-root user
+- Build context is monorepo root so `packages/go-shared` and `go.work` are available
 
 ## Workflow
 
 1. Identify target app and its runtime needs.
-2. Copy required monorepo dependencies in the builder stage.
-3. Build target artifact in `builder` stage.
-4. Copy minimal artifact into `runner` stage.
-5. Verify `CMD`, port, and Prisma/other runtime requirements before finishing.
+2. Copy `go.work`, `go.work.sum`, `packages/go-shared/`, and the target app in builder stage.
+3. Build Go binary in `builder` stage.
+4. Copy only the binary into `runner` stage.
+5. Verify `CMD`, port, and env var requirements before finishing.
 
-## Dockerfile Template (Hono API)
+## Dockerfile Template (Echo API)
 
 ```dockerfile
 # Stage 1: Builder
-FROM oven/bun:1-alpine AS builder
+FROM golang:1.26-alpine AS builder
+
 WORKDIR /app
 
-# Install dependencies
-COPY package.json bun.lockb ./
-COPY packages/ ./packages/
-RUN bun install --frozen-lockfile
-
-# Copy source and build
+COPY go.work go.work.sum* ./
+COPY packages/go-shared/ ./packages/go-shared/
 COPY apps/api/ ./apps/api/
-RUN cd apps/api && bun run build
+
+WORKDIR /app/apps/api
+RUN go build -o /bin/server ./cmd/server/main.go
 
 # Stage 2: Runner
-FROM oven/bun:1-alpine AS runner
-WORKDIR /app
+FROM alpine:3.20
 
-ENV NODE_ENV=production
-
-# Non-root user
+RUN apk --no-cache add ca-certificates tzdata
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+COPY --from=builder --chown=appuser:appgroup /bin/server .
+
 USER appuser
-
-# Copy only what is needed
-COPY --from=builder --chown=appuser:appgroup /app/apps/api/dist ./dist
-COPY --from=builder --chown=appuser:appgroup /app/apps/api/package.json ./
-
-EXPOSE 3000
-CMD ["bun", "run", "dist/index.js"]
+EXPOSE 8080
+CMD ["./server"]
 ```
 
-## Dockerfile Template (BullMQ Worker)
+## Dockerfile Template (asynq Worker)
 
 ```dockerfile
-FROM oven/bun:1-alpine AS builder
+# Stage 1: Builder
+FROM golang:1.26-alpine AS builder
+
 WORKDIR /app
 
-COPY package.json bun.lockb ./
-COPY packages/ ./packages/
-RUN bun install --frozen-lockfile
-
+COPY go.work go.work.sum* ./
+COPY packages/go-shared/ ./packages/go-shared/
 COPY apps/worker/ ./apps/worker/
-RUN cd apps/worker && bun run build
 
-FROM oven/bun:1-alpine AS runner
-WORKDIR /app
+WORKDIR /app/apps/worker
+RUN go build -o /bin/worker ./cmd/worker/main.go
 
-ENV NODE_ENV=production
+# Stage 2: Runner
+FROM alpine:3.20
 
+RUN apk --no-cache add ca-certificates tzdata
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+COPY --from=builder --chown=appuser:appgroup /bin/worker .
+
 USER appuser
-
-COPY --from=builder --chown=appuser:appgroup /app/apps/worker/dist ./dist
-COPY --from=builder --chown=appuser:appgroup /app/apps/worker/package.json ./
-
-CMD ["bun", "run", "dist/index.js"]
+CMD ["./worker"]
 ```
 
 ## Rules
 
-- Always use `--frozen-lockfile` when installing in CI/container
+- Always build from monorepo root so `go.work` resolves `packages/go-shared`
 - Never copy `.env` into the image — inject via environment variable at runtime
 - Never expose unused ports
-- If Prisma is used, ensure `prisma generate` runs in the builder stage
+- Copy `go.work.sum*` with glob to handle optional file gracefully
 
 ## Prohibitions
 
 - **FORBIDDEN** to modify `docker-compose.yml`.
 - **FORBIDDEN** to run container as root unless strictly required.
-- **FORBIDDEN** to copy the entire repo into the runner stage when only some artifacts are needed.
+- **FORBIDDEN** to copy the entire repo into the runner stage.
 - **FORBIDDEN** to leave a Dockerfile that cannot be built deterministically.
 
 ## Pre-Completion Checklist
 
-- [ ] Dockerfile uses multi-stage build
-- [ ] Runner stage contains only minimal runtime artifact
+- [ ] Dockerfile uses multi-stage build (golang:1.26-alpine builder, alpine:3.20 runner)
+- [ ] `go.work` and `packages/go-shared/` copied in builder stage
+- [ ] Runner stage contains only the compiled binary
 - [ ] Non-root user is used
-- [ ] Port and runtime command match target app
-- [ ] Container build verified or reason documented
+- [ ] Port and CMD match target app
 - [ ] All files end with newline (EOF)
