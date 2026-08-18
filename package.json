@@ -19,7 +19,7 @@
     "stack:reset": "bash ./scripts/compose.sh down -v",
     "session:status": "node ./scripts/start-session.mjs",
     "build": "turbo run build",
-    "openapi:generate": "bun apps/api/scripts/generate-openapi.ts",
+    "openapi:generate": "node scripts/generate-openapi.mjs",
     "prisma:generate": "cd apps/api && bun run prisma:generate",
     "prisma:migrate:dev": "cd apps/api && bun run prisma:migrate:dev",
     "prisma:seed": "cd apps/api && bun run prisma:seed",
